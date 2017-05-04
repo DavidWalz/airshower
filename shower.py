@@ -4,11 +4,10 @@ import numpy as np
 from utils import *
 import atmosphere
 import gumbel
-
-
+from pylab import *
 atm = atmosphere.Atmosphere()
-
-
+import gumbel
+import plotting
 def station_response(r, dX, logE=19, A=1):
     """ Simulate time trace f(t) for a given SD station and shower.
     Args:
@@ -24,8 +23,9 @@ def station_response(r, dX, logE=19, A=1):
     S0 = 1200 * 10**(logE - 19)
     # scaling with mass number
     a = A**0.15
-    S1 = S0 * a / (a + 1)
-    S2 = S0 * 1 / (a + 1)
+    b = 2 ## EM scaling
+    S1 = S0 * a / (a + 1) * 1/(b+1)
+    S2 = S0 * 1 / (a + 1) * b/(b+1)
     # TODO: add scaling with zenith angle (CIC)
     # ...
     # scaling with distance of station to shower axis
@@ -56,7 +56,7 @@ def station_response(r, dX, logE=19, A=1):
     shift = np.exp(mean2) - np.exp(mean1)
     bins = np.arange(0, 2001, 25)  # time bins [ns]
     h1 = np.histogram(np.random.lognormal(mean1, sigma1, size=N1), bins=bins)[0]
-    h2 = np.histogram(np.random.lognormal(mean2, sigma2, size=N2) + shift, bins=bins)[0]
+    h2 = np.histogram(np.random.lognormal(mean2, sigma2, size=N2) + 0.5*shift, bins=bins)[0]
 
     # total signal (simplify: 1 particle = 1 VEM)
     return h1, h2
@@ -94,9 +94,12 @@ def rand_shower_geometry(N, logE, mass):
     phi = 2 * np.pi * (np.random.rand(N) - 0.5)
     zenith = rand_zenith(N)
     v_axis = ang2vec(phi, zenith)
+#### TESTIN ######################################################
+    phi = 2 *0* np.pi * (np.random.rand(N) - 0.5)
+    zenith = 60*np.pi/180*rand_zenith(N)
 
     # shower core on ground (random offset w.r.t. grid origin)
-    v_core = SPACING * (np.random.rand(N, 3) - 0.5)
+    v_core = 0*SPACING * (np.random.rand(N, 3) - 0.5)
     v_core[:, 2] = HEIGHT  # core is always at ground level
 
     # shower maximum, require h > hmin
@@ -125,16 +128,19 @@ if __name__ == '__main__':
     # showers
     nb_events = 2
     logE = 18.5 + 1.5 * np.random.rand(nb_events)
+    logE = 20 *np.ones(nb_events)
     mass = 1 * np.ones(nb_events)
     Xmax, v_axis, v_core, v_max = rand_shower_geometry(nb_events, logE, mass)
 
     # detector response for each event
     T = np.zeros((nb_events, nb_stations))
-    S = np.zeros((nb_events, nb_stations, 80))
+    S1 = np.zeros((nb_events, nb_stations, 80))
+    S2 = np.zeros((nb_events, nb_stations, 80))
     for i in range(nb_events):
         print(i)
         s1, s2 = detector_response(logE[i], mass[i], v_axis[i], v_max[i], v_stations)
-        S[i] = s1 + s2
+        S1[i] = s1
+        S2[i] = s2
         T[i] = arrival_time_planar(v_stations, v_core[i], v_axis[i])
 
     # add per ton noise on arrival time
@@ -143,28 +149,30 @@ if __name__ == '__main__':
     # add time offset per event (to account for core position)
     T += 100E-9 * (np.random.rand(nb_events, 1) - 0.5)
 
-    # add relative noise to signal pulse
-    S += 0.02 * S * np.random.randn(*S.shape)
+#    # add relative noise to signal pulse
+#    S1 += 0.02 * S1 * np.random.randn(*S1.shape)
+#    S2 += 0.02 * S2 * np.random.randn(*S2.shape)
+#    # add absolute noise to signal pulse
+#    S1 += 0.5 + 0.2 * np.random.randn(*S1.shape)
+#    S2 += 0.5 + 0.2 * np.random.randn(*S2.shape)
 
-    # add absolute noise to signal pulse
-    S += 0.5 + 0.2 * np.random.randn(*S.shape)
-
+    plotting.plot_traces_of_array_for_one_event(Smu=S1[0], Sem=S2[0], v_axis=v_axis[0], v_stations=v_stations, arraysize = 5)
     # trigger threshold: use only stations with sufficient signal-to-noise
-    c = S.sum(axis=-1) < 80 * 0.55
-    T[c] = np.NaN
-    S[c] = np.NaN
+##    c = S.sum(axis=-1) < 80 * 0.55
+##    T[c] = np.NaN
+##    S[c] = np.NaN
 
     # TODO: apply array trigger (3T5)
 
     # save
-    np.savez_compressed(
-        'showers.npz',
-        logE=logE,
-        mass=mass,
-        Xmax=Xmax,
-        time=T,
-        signal=S,
-        showercore=v_core,
-        showeraxis=v_axis,
-        showermax=v_max,
-        detector=v_stations)
+#    np.savez_compressed(
+#        'showers.npz',
+#        logE=logE,
+#        mass=mass,
+#        Xmax=Xmax,
+#        time=T,
+#        signal=S,
+#        showercore=v_core,
+#        showeraxis=v_axis,
+#        showermax=v_max,
+#        detector=v_stations)
