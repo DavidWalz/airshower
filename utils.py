@@ -3,34 +3,38 @@ from __future__ import division
 import numpy as np
 
 
-HEIGHT = 1400  # detector height in [m]
-SPACING = 1500  # detector spacing in [m]
-
-
 def rectangular_array(n=11):
-    """ Coordinates for rectangular array with n^2 stations and given spacing.
-        Returns: n^2 x 3 array of x,y,z coordinates for each station.
-    """
+    """ Return x,y coordinates for rectangular array with n^2 stations. """
     n0 = (n - 1) / 2
-    x, y = (np.mgrid[0:n, 0:n].astype(float) - n0) * SPACING
-    z = np.ones_like(x) * HEIGHT  # z-position
-    return np.dstack([x, y, z]).reshape(-1, 3)
+    return (np.mgrid[0:n, 0:n].astype(float) - n0)
 
 
 def triangular_array(n=11, offset=True):
-    """ Coordinates for triangular array with n^2 stations and given spacing.
-        Returns: n^2 x 3 array of x,y,z coordinates for each station.
-    """
+    """ Return x,y coordinates for triangular array with n^2 stations. """
     n0 = (n - 1) / 2
     x, y = np.mgrid[0:n, 0:n].astype(float) - n0
     if offset:  # offset coordinates
         x += 0.5 * (y % 2)
     else:  # axial coordinates
         x += 0.5 * y
-    x *= SPACING
-    y *= np.sin(np.pi / 3) * SPACING
-    z = np.ones_like(x) * HEIGHT  # z-position
-    return np.dstack([x, y, z]).reshape(-1, 3)
+    y *= np.sin(np.pi / 3)
+    return x, y
+
+
+def station_coordinates(n=11, layout='axial', spacing=1500, height=1400):
+    """ Return array of n^2*(x,y,z) coordinates of SD stations for given layout. """
+    if layout == 'axial':
+        x, y = triangular_array(n, offset=False)
+    elif layout == 'offset':
+        x, y = triangular_array(n, offset=True)
+    elif layout == 'cartesian':
+        x, y = rectangular_array(n)
+    else:
+        raise ValueError('layout must be one of axial, offset, cartesian')
+    x = x.reshape(n**2) * spacing
+    y = y.reshape(n**2) * spacing
+    z = np.ones_like(x) * height
+    return np.c_[x, y, z]
 
 
 def rand_zenith(N=1, zmax=np.pi / 3):
@@ -71,23 +75,25 @@ def vec2ang(v):
     return phi, zenith
 
 
-def distance2showerplane(v, va):
+def distance2showerplane(v, vc, va):
     """ Get shortest distance to shower plane
     Args:
         v (Nx3 array): array of positions
         va (3 array): shower axis = normal vector of the shower plane
+        vc (3 array): shower core
     """
-    return np.dot(v, va)
+    return np.dot(v - vc, va)
 
 
-def distance2showeraxis(v, va):
+def distance2showeraxis(v, vc, va):
     """ Shortest distance to shower axis.
     Args:
         v (Nx3 array): array of positions
         va (3 array): shower axis
+        vc (3 array): shower core
     """
-    d = distance2showerplane(v, va)
-    vp = v - np.outer(d, va)
+    d = distance2showerplane(v, vc, va)
+    vp = v - vc - np.outer(d, va)
     return np.linalg.norm(vp, axis=-1)
 
 
@@ -110,5 +116,5 @@ def arrival_time_planar(v, vc, va):
     Return:
         array: arrival times [s]
     """
-    d = distance2showerplane(v - vc, -va)
+    d = distance2showerplane(v, vc, -va)
     return d / 3E8

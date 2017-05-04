@@ -433,12 +433,10 @@ class Atmosphere():
         mask_flat, mask_taylor, mask_numeric = self.__get_method_mask(zenith)
         tmp = np.zeros_like(zenith)
         if np.sum(mask_numeric):
-            print("get vertical height numeric")
             tmp[mask_numeric] = self._get_vertical_height_numeric(*self.__get_arguments(mask_numeric, zenith, X))
         if np.sum(mask_taylor):
             tmp[mask_taylor] = self._get_vertical_height_numeric_taylor(*self.__get_arguments(mask_taylor, zenith, X))
         if np.sum(mask_flat):
-            print("get vertical height flat")
             tmp[mask_flat] = self._get_vertical_height_flat(*self.__get_arguments(mask_flat, zenith, X))
         return tmp
 

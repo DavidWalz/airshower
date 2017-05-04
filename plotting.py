@@ -8,6 +8,7 @@ from matplotlib.colors import Normalize
 from utils import distance2showeraxis
 from pylab import *
 
+
 def plot_array(v_stations, values, label='', vmin=None, vmax=None):
     """Plot a map *values* for an detector array specified by *v_stations*.
     """
@@ -29,37 +30,32 @@ def plot_array(v_stations, values, label='', vmin=None, vmax=None):
     ax.set_ylabel('y [km]')
 
 
-def plot_traces_of_array_for_one_event(Smu, Sem, v_axis, v_stations, arraysize = 5):
-    '''plot time traces of tanks around the tank with the smallest distance to shower core
-    Sem = EM-SigmalTrace, Smu = Muon-SignalTrace, arraysize = length of array'''
-    t = np.arange(0, 2001, 25)
-    fig, axes = subplots(arraysize, arraysize, sharex=True, figsize=(29, 16), dpi=80, facecolor='w', edgecolor='k')
+def plot_traces_of_array_for_one_event(Smu, Sem, v_axis, v_stations, n=5):
+    """ Plot time traces of the n^2 central tanks
+        Sem = EM-SigmalTrace, Smu = Muon-SignalTrace
+    """
+    n0 = int(len(v_stations)**.5)
+    i0 = (n0 - n) // 2
+
+    S1 = Smu.reshape(n0, n0, -1)
+    S2 = Sem.reshape(n0, n0, -1)
+
+    fig, axes = subplots(n, n, sharex=True, figsize=(29, 16), facecolor='w')
+    plt.tight_layout()
     t = np.arange(12.5, 2001, 25)
-    tight_layout()
-    coordVcore = np.argmin(distance2showeraxis(v_stations, v_axis))
-    coordX = int(coordVcore/11)
-    coordY = coordVcore%11
-    coords = np.array(0)
-    for j in range(arraysize):
-        for k in range(arraysize):
-            coords = np.append(coords, (coordX-2+j)*11 + (coordY-2+k))
-    coords = coords[1:arraysize*arraysize+1]
-    for i, ax in enumerate(axes.flat):
-        try:
-            h1, h2 = Smu[coords[i]], Sem[coords[i]]
-        except TypeError:
-            h2 = np.histogram(0, bins=t)[0].astype(float)
-        ax.step(t, h1 + h2, c='k', where='mid')
-        ax.step(t, h1, label='$\mu$', where='mid')
-        ax.step(t, h2, label='$e\gamma$', where='mid')
-        ax.legend(title='r=%i' % coords[i], fontsize='x-small')
-        ax.set_xlim(0, 1500)
-        ax.grid(True)
-    for k in range(arraysize):
-        for l in range(arraysize):
-            axes[k, l].set_xlabel('$t$ / ns')
-            axes[k, l].set_ylabel('$S$ / VEM')
-    savefig('trace_VEM.png')#, bbox_inches='tight')
+    for ix in range(n):
+        for iy in range(n):
+            ax = axes[ix, iy]
+            h1 = S1[ix + i0, iy + i0]
+            h2 = S2[ix + i0, iy + i0]
+            ax.step(t, h1 + h2, c='k', where='mid')
+            ax.step(t, h1, label='$\mu$', where='mid')
+            ax.step(t, h2, label='$e\gamma$', where='mid')
+            ax.legend(title='%i, %i' % (ix + i0, iy + i0), fontsize='x-small')
+            ax.set_xlim(0, 1500)
+            ax.grid(True)
+            ax.set_xlabel('$t$ / ns', fontsize='x-small')
+            ax.set_ylabel('$S$ / VEM', fontsize='x-small')
 
 
 if __name__ == '__main__':
