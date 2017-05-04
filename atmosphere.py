@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import integrate, interpolate, optimize
+import os.path
 
 
 r_e = 6.371 * 1e6  # radius of Earth
@@ -207,8 +208,8 @@ class Atmosphere():
     Could use some refactoring.
     """
 
-    def __init__(self, model=17, n_taylor=5, curved=True, zenith_numeric=np.deg2rad(83)):
-        print('Loading model %i' % model)
+    def __init__(self, model=17, n_taylor=5, curved=True, zenith_numeric=np.deg2rad(83), filename=None):
+        print('Using model %i' % model)
         self.model = model
         self.curved = curved
         self.n_taylor = n_taylor
@@ -217,17 +218,33 @@ class Atmosphere():
         self.c = atm_models[model]['c']
         self.h = atm_models[model]['h']
         self.num_zenith = 101
-        if curved:
+
+        if not curved:
+            return
+
+        self.__zenith_numeric = 0
+
+        if filename is None:
+            filename = 'atmosphere_model%i.npz' % model
+
+        if os.path.exists(filename):
+            print('Reading constants from %s' % filename)
+            data = np.load(filename)
+            assert self.model == data['model'], 'File contains parameters for different model %i' % model
+            self.a = data['a']
+            self.d = data['d']
+        else:
             print('Calculating constants for curved atmosphere')
-            self.__zenith_numeric = 0
             self.d = np.zeros(self.num_zenith)
             self.a = self.__calculate_a()
-            zenith = np.arccos(np.linspace(0, 1, self.num_zenith))
-            mask = zenith < np.deg2rad(83)
-            self.a_funcs = []
-            for i in range(5):
-                self.a_funcs.append(interpolate.interp1d(zenith[mask], self.a[:, i][mask], kind='cubic'))
-            print('Done')
+            np.savez_compressed(filename, a=self.a, d=self.d, model=model)
+
+        zenith = np.arccos(np.linspace(0, 1, self.num_zenith))
+        mask = zenith < zenith_numeric
+        self.a_funcs = []
+        for i in range(5):
+            func = interpolate.interp1d(zenith[mask], self.a[:, i][mask], kind='cubic')
+            self.a_funcs.append(func)
 
     def __calculate_a(self,):
         b = self.b
