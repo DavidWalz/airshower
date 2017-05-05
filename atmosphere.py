@@ -2,8 +2,8 @@ import numpy as np
 from scipy import integrate, interpolate, optimize
 import os.path
 
-r_e = 6.371 * 1e6  # radius of Earth
-h_max = 112829.2  # height above sea level where the mass overburden vanishes
+R_E = 6.371 * 1e6  # radius of Earth
+H_MAX = 112829.2  # height above sea level where the mass overburden vanishes
 
 """
 Atmospheric density models as used in CORSIKA.
@@ -92,13 +92,13 @@ atm_models = {
 
 def distance(h, zenith=0, observation_level=0):
     """Distance for given height above ground and zenith angle"""
-    r = r_e + observation_level
+    r = R_E + observation_level
     return (h**2 + 2 * r * h + r**2 * np.cos(zenith)**2)**0.5 - r * np.cos(zenith)
 
 
 def height_at_distance(d, zenith=0, observation_level=0):
     """Height above ground for given distance and zenith angle"""
-    r = r_e + observation_level
+    r = R_E + observation_level
     x = d * np.sin(zenith)
     y = d * np.cos(zenith) + r
     h = (x**2 + y**2)**0.5 - r
@@ -123,7 +123,7 @@ def slant_depth(h, zenith=0, model=default_model):
     x = np.where(i < 4,
                  a[i] + b[i] * np.exp(-h / c[i]),
                  a[4] - b[4] * h / c[4])
-    x = np.where(h > h_max, 0, x)
+    x = np.where(h > H_MAX, 0, x)
     return x * 1E-4 / np.cos(zenith)
 
 
@@ -147,7 +147,7 @@ def height_at_slant_depth(x, zenith=0, model=default_model):
     h = np.where(i < 4,
                  -c[i] * np.log((x * 1E4 - a[i]) / b[i]),
                  -c[4] * (x * 1E4 - a[4]) / b[4])
-    h = np.where(x <= 0, h_max, h)
+    h = np.where(x <= 0, H_MAX, h)
     return h
 
 
@@ -265,32 +265,32 @@ class Atmosphere:
             ct = np.cos(zenith)
             dldh = np.ones_like(zenith) / ct
             if self.n_taylor >= 1:
-                dldh += -(st**2 / ct**3 * (c + h) / r_e)
+                dldh += -(st**2 / ct**3 * (c + h) / R_E)
             if self.n_taylor >= 2:
-                dldh += 1.5 * st**2 * (2 * c**2 + 2 * c * h + h**2) / (r_e**2 * ct**5)
+                dldh += 1.5 * st**2 * (2 * c**2 + 2 * c * h + h**2) / (R_E**2 * ct**5)
             if self.n_taylor >= 3:
                 t1 = 6 * c**3 + 6 * c**2 * h + 3 * c * h**2 + h**3
-                dldh += st**2 / (2 * r_e**3 * ct**7) * (ct**2 - 5) * t1
+                dldh += st**2 / (2 * R_E**3 * ct**7) * (ct**2 - 5) * t1
             if self.n_taylor >= 4:
                 t1 = 24 * c**4 + 24 * c**3 * h + 12 * c**2 * h**2 + 4 * c * h**3 + h**4
-                dldh += -1. * st**2 * 5. / (8. * r_e**4 * ct**9) * (3 * ct**2 - 7) * t1
+                dldh += -1. * st**2 * 5. / (8. * R_E**4 * ct**9) * (3 * ct**2 - 7) * t1
             if self.n_taylor >= 5:
                 t1 = 120 * c**5 + 120 * c**4 * h + 60 * c**3 * h**2 + 20 * c**2 * h**3 + 5 * c * h**4 + h**5
-                dldh += st**2 * (ct**4 - 14. * ct**2 + 21.) * (-3. / 8.) / (r_e**5 * ct**11) * t1
+                dldh += st**2 * (ct**4 - 14. * ct**2 + 21.) * (-3. / 8.) / (R_E**5 * ct**11) * t1
         elif i == 4:
             st = np.sin(zenith)
             ct = np.cos(zenith)
             dldh = np.ones_like(zenith) / ct
             if self.n_taylor >= 1:
-                dldh += (-0.5 * st**2 / ct**3 * h / r_e)
+                dldh += (-0.5 * st**2 / ct**3 * h / R_E)
             if self.n_taylor >= 2:
-                dldh += 0.5 * st**2 / ct**5 * (h / r_e)**2
+                dldh += 0.5 * st**2 / ct**5 * (h / R_E)**2
             if self.n_taylor >= 3:
-                dldh += 1. / 8. * (st**2 * (ct**2 - 5) * h**3) / (r_e**3 * ct**7)
+                dldh += 1. / 8. * (st**2 * (ct**2 - 5) * h**3) / (R_E**3 * ct**7)
             if self.n_taylor >= 4:
-                dldh += -1. / 8. * st**2 * (3 * ct**2 - 7) * (h / r_e)**4 / ct**9
+                dldh += -1. / 8. * st**2 * (3 * ct**2 - 7) * (h / R_E)**4 / ct**9
             if self.n_taylor >= 5:
-                dldh += -1. / 16. * st**2 * (ct**4 - 14 * ct**2 + 21) * (h / r_e)**5 / ct**11
+                dldh += -1. / 16. * st**2 * (ct**4 - 14 * ct**2 + 21) * (h / R_E)**5 / ct**11
         else:
             raise ValueError("ERROR, height index our of bounds")
 
@@ -310,8 +310,8 @@ class Atmosphere:
         mask1 = (h >= layers[0]) & (h < layers[1])
         mask2 = (h >= layers[1]) & (h < layers[2])
         mask3 = (h >= layers[2]) & (h < layers[3])
-        mask4 = (h >= layers[3]) & (h < h_max)
-        mask5 = h >= h_max
+        mask4 = (h >= layers[3]) & (h < H_MAX)
+        mask5 = h >= H_MAX
         return np.array([mask0, mask1, mask2, mask3, mask4, mask5])
 
     def __get_X_masks(self, X, zenith):
@@ -320,7 +320,7 @@ class Atmosphere:
         mask1 = (X <= layers[0]) & (X > layers[1])
         mask2 = (X <= layers[1]) & (X > layers[2])
         mask3 = (X <= layers[2]) & (X > layers[3])
-        mask4 = (X <= layers[3]) & (X > self._get_atmosphere(zenith, h_max))
+        mask4 = (X <= layers[3]) & (X > self._get_atmosphere(zenith, H_MAX))
         mask5 = X <= 0
         return np.array([mask0, mask1, mask2, mask3, mask4, mask5])
 
@@ -339,7 +339,7 @@ class Atmosphere:
 
     def _get_atmosphere(self, zenith, h_low=0., h_up=np.infty):
         mask_flat, mask_taylor, mask_numeric = self.__get_method_mask(zenith)
-        mask_finite = np.array((h_up * np.ones_like(zenith)) < h_max)
+        mask_finite = np.array((h_up * np.ones_like(zenith)) < H_MAX)
         is_mask_finite = np.sum(mask_finite)
         tmp = np.zeros_like(zenith)
         if np.sum(mask_numeric):
@@ -420,7 +420,7 @@ class Atmosphere:
             if t_h_up <= t_h_low:
                 return np.nan
             if t_h_up == np.infty:
-                t_h_up = h_max
+                t_h_up = H_MAX
             b = t_h_up
             d_low = distance(t_h_low, z)
             d_up = distance(b, z)
@@ -437,7 +437,7 @@ class Atmosphere:
         y = np.where(h < layers[1], y, a[2] + b[2] * np.exp(-1 * h / c[2]))
         y = np.where(h < layers[2], y, a[3] + b[3] * np.exp(-1 * h / c[3]))
         y = np.where(h < layers[3], y, a[4] - b[4] * h / c[4])
-        y = np.where(h < h_max, y, 0)
+        y = np.where(h < H_MAX, y, 0)
         return y / np.cos(zenith)
 
     def get_vertical_height(self, zenith, xmax):

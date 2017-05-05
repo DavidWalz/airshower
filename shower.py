@@ -70,11 +70,9 @@ def detector_response(logE, mass, v_axis, v_core, v_max, v_stations):
     """
     r = utils.distance2showeraxis(v_stations, v_core, v_axis)  # radial distance to shower axis
     phi, zen = utils.vec2ang(v_max - v_stations)  # direction of shower maximum relative to stations
-    # distance to shower maximum in [g/cm^2]
-    dX = atm.get_atmosphere(
-        zen,  # zenith angle of shower maximum seen from each station
-        h_low=v_stations[:, 2],  # height of stations
-        h_up=v_max[2])  # height of shower maximum
+
+    # distance from each station to shower maximum in [g/cm^2]
+    dX = atmosphere.slant_depth(v_stations[:, 2], zen) - atmosphere.slant_depth(v_max[2], zen)
 
     # time traces for each station
     n = len(v_stations)
@@ -106,11 +104,14 @@ def rand_shower_geometry(N, logE, mass):
     Xmax = np.empty(N)
     hmax = np.empty(N)
     i = 0
+    j = 0
     while i < N:
+        j += 1
         Xmax[i] = gumbel.rand_gumbel(logE[i], mass[i])
         hmax[i] = atmosphere.height_at_slant_depth(Xmax[i], zenith[i])
         if hmax[i] > HEIGHT + 200:
             i += 1
+    print('%i of %i showers accepted' % (i, j))
     dmax = (hmax - HEIGHT) / np.cos(zenith)  # distance to Xmax
     v_max = v_core + v_axis * dmax[:, np.newaxis]
 
@@ -137,7 +138,7 @@ if __name__ == '__main__':
     S1 = np.zeros((nb_events, nb_stations, 80))
     S2 = np.zeros((nb_events, nb_stations, 80))
     for i in range(nb_events):
-        print(i)
+        print('%4i, logE = %.2f' % (i, logE[i]))
         s1, s2 = detector_response(logE[i], mass[i], v_axis[i], v_core[i], v_max[i], v_stations)
         S1[i] = s1
         S2[i] = s2
