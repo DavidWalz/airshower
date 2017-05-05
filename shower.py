@@ -93,31 +93,24 @@ def rand_shower_geometry(N, logE, mass):
     """ Generate random shower geometries: Xmax, axis, core, maximum. """
     N = len(logE)
 
-    # 1) shower axis
+    # 1) random shower axis
     phi = 2 * np.pi * (np.random.rand(N) - 0.5)
     zenith = utils.rand_zenith(N)
-    # phi = 0 * np.ones(N)
-    # zenith = np.deg2rad(60) * np.ones(N)
     v_axis = utils.ang2vec(phi, zenith)
 
-    # 2) shower core on ground (random offset w.r.t. grid origin)
+    # 2) random shower core on ground (offset w.r.t. grid origin)
     v_core = SPACING * (np.random.rand(N, 3) - 0.5)
     v_core[:, 2] = HEIGHT  # core is always at ground level
 
-    # 3) shower maximum, require h > hmin
+    # 3) random shower maximum, require h > hmin
     Xmax = np.empty(N)
     hmax = np.empty(N)
     i = 0
     while i < N:
         Xmax[i] = gumbel.rand_gumbel(logE[i], mass[i])
-        try:
-            hmax[i] = atm.get_vertical_height(zenith[i], Xmax[i])
-        except:
-            continue
-        if hmax[i] < HEIGHT + 200:
-            continue  # shower maximum too low, repeat
-        i += 1
-        print(i)
+        hmax[i] = atmosphere.height_at_slant_depth(Xmax[i], zenith[i])
+        if hmax[i] > HEIGHT + 200:
+            i += 1
     dmax = (hmax - HEIGHT) / np.cos(zenith)  # distance to Xmax
     v_max = v_core + v_axis * dmax[:, np.newaxis]
 
