@@ -7,7 +7,6 @@ import gumbel
 import plotting
 
 
-atm = atmosphere.Atmosphere()
 HEIGHT = 1400
 SPACING = 1500
 
@@ -24,7 +23,7 @@ def station_response(r, dX, logE=19, A=1):
     """
     # strength of muon and em signal
     # scaling with energy
-    S0 = 2000 * 10**(logE - 19)
+    S0 = 1200 * 10**(logE - 19)
     # scaling with mass number and relative scaling mu/em
     a = A**0.15
     S1 = S0 * a / (a + 1) * 1
@@ -126,7 +125,7 @@ if __name__ == '__main__':
 
     # showers
     print('simulating showers')
-    nb_events = 100
+    nb_events = 1000
     logE = 18.5 + 1.5 * np.random.rand(nb_events)
     # logE = 20 * np.ones(nb_events)
     mass = 1 * np.ones(nb_events)
@@ -139,10 +138,12 @@ if __name__ == '__main__':
     S2 = np.zeros((nb_events, nb_stations, 80))
     for i in range(nb_events):
         print('%4i, logE = %.2f' % (i, logE[i]))
-        s1, s2 = detector_response(logE[i], mass[i], v_axis[i], v_core[i], v_max[i], v_stations)
-        S1[i] = s1
-        S2[i] = s2
+        S1[i], S2[i] = detector_response(
+            logE[i], mass[i], v_axis[i], v_core[i], v_max[i], v_stations)
         T[i] = utils.arrival_time_planar(v_stations, v_core[i], v_axis[i])
+
+    # total signal
+    S = S1 + S2
 
     # add per ton noise on arrival time
     T += 20E-9 * np.random.randn(*T.shape)
@@ -150,38 +151,30 @@ if __name__ == '__main__':
     # add time offset per event (to account for core position)
     T += 100E-9 * (np.random.rand(nb_events, 1) - 0.5)
 
-#    # add relative noise to signal pulse
-#    S1 += 0.02 * S1 * np.random.randn(*S1.shape)
-#    S2 += 0.02 * S2 * np.random.randn(*S2.shape)
-#    # add absolute noise to signal pulse
-#    S1 += 0.5 + 0.2 * np.random.randn(*S1.shape)
-#    S2 += 0.5 + 0.2 * np.random.randn(*S2.shape)
+    # add relative noise to signal pulse
+    S += 0.02 * S * np.random.randn(*S.shape)
+
+    # add absolute noise to signal pulse
+    S += 1 + 0.2 * np.random.randn(*S.shape)
 
     # trigger threshold: use only stations with sufficient signal-to-noise
-##    c = S.sum(axis=-1) < 80 * 0.55
-##    T[c] = np.NaN
-##    S[c] = np.NaN
+    c = S.sum(axis=-1) < 80 * 1.2
+    T[c] = np.NaN
+    S[c] = np.NaN
 
     # TODO: apply array trigger (3T5)
 
     # save
-#    np.savez_compressed(
-#        'showers.npz',
-#        logE=logE,
-#        mass=mass,
-#        Xmax=Xmax,
-#        time=T,
-#        signal=S,
-#        showercore=v_core,
-#        showeraxis=v_axis,
-#        showermax=v_max,
-#        detector=v_stations)
-
-    plotting.plot_traces_of_array_for_one_event(
-        Smu=S1[0], Sem=S2[0], v_axis=v_axis[0], v_stations=v_stations, n=5)
-
-    # r = utils.distance2showeraxis(v_stations, v_core[0], v_axis[0])
-    # plotting.plot_array(v_stations, r)
-
-    import matplotlib.pyplot as plt
-    plt.show()
+    np.savez_compressed(
+        'showers.npz',
+        logE=logE,
+        mass=mass,
+        Xmax=Xmax,
+        time=T,
+        signal=S,
+        signal1=S1,
+        signal2=S2,
+        showercore=v_core,
+        showeraxis=v_axis,
+        showermax=v_max,
+        detector=v_stations)
