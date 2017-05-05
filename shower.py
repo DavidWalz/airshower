@@ -11,31 +11,33 @@ HEIGHT = 1400
 SPACING = 1500
 
 
-def station_response(r, dX, logE=19, A=1):
+def station_response(r, dX, logE=19, zenith=0, mass=1):
     """ Simulate time trace f(t) for a given SD station and shower.
     Args:
         r (float): radial distance to shower axis in [m]
         dX (float): distance to Xmax in [g/cm^2]
         logE (float): log10(E/eV)
-        A (float): mass number
+        zenith (float): zenith angle
+        mass (float): mass number
     Returns:
         time traces f_muon(t) and f_em(t) in [VEM] for t = 0 - 2000 ns in bins of 25 ns
     """
-    # strength of muon and em signal
+    # signal strength
     # scaling with energy
-    S0 = 1200 * 10**(logE - 19)
-    # scaling with mass number and relative scaling mu/em
-    a = A**0.15
+    S0 = 800 * 10**(logE - 19)
+    # # scaling with zenith angle (similar to S1000 --> S38 relation, CIC)
+    # x = np.cos(zenith)**2 - np.cos(np.deg2rad(38))**2
+    # S0 *= 1 + 0.95 * x - 1.4 * x**2 - 1.1 * x**3
+    # relative scaling mu/em and scaling with mass number
+    a = mass**0.15
     S1 = S0 * a / (a + 1) * 1
-    S2 = S0 * 1 / (a + 1) * 3
-    # TODO: add scaling with zenith angle (CIC)
-    # ...
+    S2 = S0 * 1 / (a + 1) * 2.5
     # scaling with distance of station to shower axis
-    S1 *= np.minimum((r / 1000)**-4.3, 1000)
-    S2 *= np.minimum((r / 1000)**-5.5, 1000)
+    S1 *= (np.maximum(r, 150) / 1000)**-4.7
+    S2 *= (np.maximum(r, 150) / 1000)**-6.1
     # scaling with traversed atmosphere to station
-    S1 *= np.minimum((dX / 100)**-0.1, 10)
-    S2 *= np.minimum((dX / 100)**-0.4, 10)
+    S1 *= (np.maximum(dX, 10) / 100)**-0.05
+    S2 *= (np.maximum(dX, 10) / 100)**-0.2
 
     # limit total signal, otherwise we get memory problems when drawing that many samples from distribution
     Stot = S1 + S2
@@ -67,6 +69,8 @@ def station_response(r, dX, logE=19, A=1):
 def detector_response(logE, mass, v_axis, v_core, v_max, v_stations):
     """ Simulate the detector response for all SD stations and one event
     """
+    _, zenith = utils.vec2ang(v_axis)
+
     r = utils.distance2showeraxis(v_stations, v_core, v_axis)  # radial distance to shower axis
     phi, zen = utils.vec2ang(v_max - v_stations)  # direction of shower maximum relative to stations
 
@@ -79,7 +83,7 @@ def detector_response(logE, mass, v_axis, v_core, v_max, v_stations):
     S2 = np.zeros((n, 80))  # em traces
 
     for j in range(n):
-        h1, h2 = station_response(r=r[j], dX=dX[j], logE=logE, A=mass)
+        h1, h2 = station_response(r=r[j], dX=dX[j], logE=logE, zenith=zenith, mass=mass)
         S1[j] = h1
         S2[j] = h2
 
@@ -120,12 +124,12 @@ def rand_shower_geometry(N, logE, mass):
 if __name__ == '__main__':
     # detector array
     n = 11
-    v_stations = utils.station_coordinates(n, layout='cartesian')  # x,y,z coordinates of SD stations
+    v_stations = utils.station_coordinates(n, layout='offset')  # x,y,z coordinates of SD stations
     nb_stations = n**2  # number of stations
 
     # showers
     print('simulating showers')
-    nb_events = 1000
+    nb_events = 400
     logE = 18.5 + 1.5 * np.random.rand(nb_events)
     # logE = 20 * np.ones(nb_events)
     mass = 1 * np.ones(nb_events)
@@ -155,10 +159,11 @@ if __name__ == '__main__':
     S += 0.02 * S * np.random.randn(*S.shape)
 
     # add absolute noise to signal pulse
-    S += 1 + 0.2 * np.random.randn(*S.shape)
+    noise_level = 1.2
+    S += noise_level * (1 + 0.5 * np.random.randn(*S.shape))
 
     # trigger threshold: use only stations with sufficient signal-to-noise
-    c = S.sum(axis=-1) < 80 * 1.2
+    c = S.sum(axis=-1) < 80 * noise_level * 1.2
     T[c] = np.NaN
     S[c] = np.NaN
 

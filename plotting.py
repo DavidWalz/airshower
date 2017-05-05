@@ -133,6 +133,7 @@ def plot_phi_distribution(phi, fname=None):
     ax.set_ylabel('frequency')
     maybe_save(fig, fname)
 
+
 def plot_xmax_distribution(Xmax, fname=None):
     """ histogram of Xmax values """
     print('Plot Xmax distribution')
@@ -182,18 +183,6 @@ def plot_stations_vs_phi(phi, S, fname=None):
     ax.set_xlabel('Phi')
     ax.set_ylabel('Number of Stations')
     maybe_save(fig, fname)
-
-def plot_tanks_with_hits_vs_zenith(v_axis, S):
-    ''' plot tanks with hits against zenith angular
-        gets v_axis, S=Signal '''
-    zenith = utils.vec2ang(v_axis)[1]*180/np.pi
-    nt = np.sum(~np.isnan(S), axis=(1))
-    fig = plt.figure()
-    ax = sns.regplot(x=zenith, y=nt,  x_bins = np.linspace(0, 60, 30), fit_reg=False)
-    ax.grid()
-    ax.set_xlabel('zenith [degree]')
-    ax.set_ylabel('Number of Stations')
-    fig.savefig('./nstations_vs_zenith.png')
 
 
 if __name__ == '__main__':
