@@ -8,7 +8,7 @@ from matplotlib.colors import Normalize
 from utils import distance2showeraxis
 from pylab import *
 import seaborn.apionly as sns
-
+import utils
 
 def plot_array(v_stations, values, label='', vmin=None, vmax=None):
     """Plot a map *values* for an detector array specified by *v_stations*.
@@ -61,23 +61,25 @@ def plot_traces_of_array_for_one_event(Smu, Sem, v_axis, v_stations, n=5):
     ax.set_ylabel('$S$ / VEM', fontsize='x-small')
     savefig('trace_VEM.png')
 
-def plot_time_distribution(t):
+def plot_time_distribution(T):
+    ''' plot histogram of the arrival times
+        gets T=Time '''
     # histogram of time values
-    print "time"
     fig, ax = plt.subplots(1)
-    ax.hist(t[~np.isnan(t)].flatten(), bins=40, normed=True)
+    ax.hist(T[~np.isnan(T)].flatten(), bins=40, normed=True)
     ax.grid()
     ax.set_xlabel('time [ms]')
     ax.set_ylabel('frequency')
     fig.savefig('./time_distribution.png')
 
-def plot_total_signal_distribution(s):
-    print "signal"
+def plot_total_signal_distribution(S):
+    ''' plot histogram of total signal
+        gets S=Signal '''
     # histogram of signal values
-    s = np.sum(s, axis=-1)
-    s[np.isnan(s)] = 0
+    S = np.sum(S, axis=-1)
+    S[np.isnan(S)] = 0
     fig, ax = plt.subplots(1)
-    ax.hist(np.sum(s, axis=(-1)), bins=401, normed=True)
+    ax.hist(np.sum(S, axis=(-1)), bins=401, normed=True)
     ax.grid()
     plt.yscale('log')
     ax.set_xlabel('signal [a.u.]')
@@ -85,7 +87,8 @@ def plot_total_signal_distribution(s):
     fig.savefig('./total_signal_distribution.png')
 
 def plot_energy_distribution(logE):
-    print "energy"
+    ''' plot energy histogram
+        gets logE '''
     # histogram of Energy values
     fig, ax = plt.subplots(1)
     ax.hist(logE, bins = np.linspace(18.5, 20, 69), normed=False)
@@ -94,16 +97,29 @@ def plot_energy_distribution(logE):
     ax.set_ylabel('frequency')
     fig.savefig("./energy_distribution.png")
 
-def plot_energy_vs_tanks_with_hits(logE, s):
-    print "energy vc tanks"
+def plot_energy_vs_tanks_with_hits(logE, S):
+    ''' plot energy against tanks with hits
+        gets logE, S=Signal '''
     # histogram tons with hits vs. Energy
-    nt = np.sum(~np.isnan(s), axis=(1))
+    nt = np.sum(~np.isnan(S), axis=(1))
     fig = plt.figure()
     ax = sns.regplot(x=logE, y=nt,  x_bins = np.linspace(18.5, 20, 69), fit_reg=False)
     ax.grid()
     ax.set_xlabel('Energy')
     ax.set_ylabel('Number of Stations')
     fig.savefig('./energy_vs_nstations.png')
+
+def plot_tanks_with_hits_vs_zenith(v_axis, S):
+    ''' plot tanks with hits against zenith angular
+        gets v_axis, S=Signal '''
+    zenith = utils.vec2ang(v_axis)[1]*180/np.pi
+    nt = np.sum(~np.isnan(S), axis=(1))
+    fig = plt.figure()
+    ax = sns.regplot(x=zenith, y=nt,  x_bins = np.linspace(0, 60, 30), fit_reg=False)
+    ax.grid()
+    ax.set_xlabel('zenith [degree]')
+    ax.set_ylabel('Number of Stations')
+    fig.savefig('./nstations_vs_zenith.png')
 
 
 if __name__ == '__main__':
