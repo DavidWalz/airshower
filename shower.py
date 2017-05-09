@@ -24,7 +24,7 @@ def station_response(r, dX, logE=19, zenith=0, mass=1):
     """
     # signal strength
     # scaling with energy
-    S0 = 800 * 10**(logE - 19)
+    S0 = 900 * 10**(logE - 19)
     # # scaling with zenith angle (similar to S1000 --> S38 relation, CIC)
     # x = np.cos(zenith)**2 - np.cos(np.deg2rad(38))**2
     # S0 *= 1 + 0.95 * x - 1.4 * x**2 - 1.1 * x**3
@@ -36,8 +36,8 @@ def station_response(r, dX, logE=19, zenith=0, mass=1):
     S1 *= (np.maximum(r, 150) / 1000)**-4.7
     S2 *= (np.maximum(r, 150) / 1000)**-6.1
     # scaling with traversed atmosphere to station
-    S1 *= (np.maximum(dX, 10) / 100)**-0.05
-    S2 *= (np.maximum(dX, 10) / 100)**-0.2
+    S1 *= np.minimum((dX / 100)**-0.1, 10) ## -0.1
+    S2 *= np.minimum((dX / 100)**-0.4, 10) ## -0.4
 
     # limit total signal, otherwise we get memory problems when drawing that many samples from distribution
     Stot = S1 + S2
@@ -129,7 +129,7 @@ if __name__ == '__main__':
 
     # showers
     print('simulating showers')
-    nb_events = 400
+    nb_events = 100000
     logE = 18.5 + 1.5 * np.random.rand(nb_events)
     # logE = 20 * np.ones(nb_events)
     mass = 1 * np.ones(nb_events)
@@ -170,16 +170,23 @@ if __name__ == '__main__':
     # TODO: apply array trigger (3T5)
 
     # save
-    np.savez_compressed(
-        'showers.npz',
-        logE=logE,
-        mass=mass,
-        Xmax=Xmax,
-        time=T,
-        signal=S,
-        signal1=S1,
-        signal2=S2,
-        showercore=v_core,
-        showeraxis=v_axis,
-        showermax=v_max,
-        detector=v_stations)
+    limit = 10000
+    print "Saving data..."
+    n = nb_events//limit
+    for i in range(n):
+        np.savez_compressed('showersTEST_%i.npz' %i,logE=logE[limit*i:limit*(i+1)], mass=mass[limit*i:limit*(i+1)], Xmax=Xmax[limit*i:limit*(i+1)], time=T[limit*i:limit*(i+1)], signal=S[limit*i:limit*(i+1)], signal1=S1[limit*i:limit*(i+1)], signal2=S2[limit*i:limit*(i+1)], showercore=v_core[limit*i:limit*(i+1)], showeraxis=v_axis[limit*i:limit*(i+1)], showermax=v_max[limit*i:limit*(i+1)], detector=v_stations[limit*i:limit*(i+1)])
+
+    np.savez_compressed('showers_%i.npz' %n,
+ logE=logE[limit*n:], mass=mass[limit*n:], Xmax=Xmax[limit*n:], time=T[limit*n:], signal=S[limit*n:], signal1=S1[limit*n:], signal2=S2[limit*n:], showercore=v_core[limit*n:], showeraxis=v_axis[limit*n:], showermax=v_max[limit*n:], detector=v_stations[limit*n:])
+    phi, zenith = utils.vec2ang(v_axis)
+    plotting.plot_time_distribution(T, fname='plots/time_distribution.png')
+    plotting.plot_signal_distribution(S, fname='plots/signal_distribution.png')
+    plotting.plot_energy_distribution(logE, fname='plots/energy_distribution.png')
+    plotting.plot_xmax_distribution(Xmax, fname='plots/xmax_distribution.png')
+    plotting.plot_zenith_distribution(zenith, fname='plots/zenith_distribution.png')
+    plotting.plot_phi_distribution(phi, fname='plots/phi_distribution.png')
+    plotting.plot_stations_vs_energy(logE, S, fname='plots/stations_vs_energy.png')
+    plotting.plot_stations_vs_zenith(zenith, S, fname='plots/stations_vs_zenith.png')
+    plotting.plot_stations_vs_zenith(phi, S, fname='plots/stations_vs_phi.png')
+    plotting.plot_array_traces(Smu=S1[0], Sem=S2[0], v_stations=v_stations, n=5, fname='plots/example-trace.png')
+print "Finished!"
