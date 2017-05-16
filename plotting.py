@@ -208,13 +208,13 @@ if __name__ == '__main__':
 
         plot_array(
             v_stations, T[i] * 1E6, v_core=v_core[i], v_axis=v_axis[i],
-            vmin=-10, vmax=10, label='time [mu s]', title=title,
+            vmin=-10, vmax=10, label='time [$\mu$ s]', title=title,
             fname='plots/example-%i-time.png' % i)
 
         logStot = np.log10(S.sum(axis=-1))
         plot_array(
             v_stations, logStot[i], v_core=v_core[i], v_axis=v_axis[i],
-            vmin=1, vmax=5, label='log(Total_Signal)', title=title,
+            vmin=1, vmax=5, label='$\log_{10}(S_\mathrm{tot})$', title=title,
             fname='plots/example-%i-signal.png' % i)
 
         plot_array_traces(

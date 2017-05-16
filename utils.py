@@ -110,11 +110,26 @@ def arrival_time_planar(v, vc, va):
     """ Get arrival times for a planar wavefront.
     Note: The shower core is not considered here and as it only adds a constant time offset to all stations.
     Args:
-        v (N x 3 array)
+        v (N x 3 array): array of vectors
         vc (3 array): shower core
         va (3 array): shower axis, pointing upwards
     Return:
         array: arrival times [s]
     """
     d = distance2showerplane(v, vc, -va)
+    return d / 3E8
+
+
+def arrival_time_spherical(v, v0, vc=None):
+    """ Get arrival times for a spherical wavefront.
+    Args:
+        v (N x 3 array): array of vectors
+        v0 (3 array): virtual shower origin
+        vc (3 array, optional): shower core
+    Return:
+        array: arrival times [s]
+    """
+    d = np.linalg.norm(v - v0, axis=1)
+    if vc is not None:
+        d -= np.linalg.norm(vc - v0)
     return d / 3E8
