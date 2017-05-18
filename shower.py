@@ -146,7 +146,9 @@ def rand_events(logE, mass, v_stations, fname=None):
     # total signal
     S = S1 + S2
     # add per ton noise on arrival time
-    T += 20E-9 * np.random.randn(*T.shape)
+    Stot = S.sum(axis=-1)
+    sigma = 8. / (1 + np.log10(Stot + 1))  # varies from ~ 1 - 8
+    T += sigma * 40E-9 * np.random.randn(*T.shape)
     # add time offset per event (to account for core position)
     T += 100E-9 * (np.random.rand(nb_events, 1) - 0.5)
     # add relative noise to signal pulse
