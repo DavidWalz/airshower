@@ -98,15 +98,19 @@ def rand_shower_geometry(logE, mass):
     v_axis = utils.ang2vec(phi, zenith)
 
     # 2) random shower core on ground (offset w.r.t. grid origin)
-    v_core = SPACING * (np.random.rand(nb_showers, 3) - 0.5)
-    v_core[:, 2] = HEIGHT  # core is always at ground level
+    r = SPACING / 2 * np.random.rand(nb_showers)**.5
+    p = np.random.rand(nb_showers) * 2 * np.pi
+    x = r * np.cos(p)
+    y = r * np.sin(p)
+    z = HEIGHT * np.ones_like(p)
+    v_core = np.c_[x, y, z]
 
     # 3) random shower maximum, require Xmax 200m above ground
     Xmax = gumbel.rand_gumbel(logE, mass)
     Xmax_max = atmosphere.slant_depth(HEIGHT + 200, zenith)
 
     while not np.all(Xmax < Xmax_max):
-        idx = Xmax > Xmax_max  # resample these Xmax values
+        idx = Xmax > Xmax_max  # resample shower maxima less than 200 above ground
         Xmax[idx] = gumbel.rand_gumbel(logE[idx], mass[idx])
 
     # 4) point of shower maximum
