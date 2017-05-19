@@ -178,22 +178,37 @@ def rand_events(logE, mass, v_stations, fname=None):
 if __name__ == '__main__':
     # detector array, vector of (x,y,z) positions
     v_stations = utils.station_coordinates(11, layout='offset')
-
-    # simulate events
-    nb_events = 100
-    logE = 18.5 + 1.5 * np.random.rand(nb_events)
-    mass = 1 * np.ones(nb_events)
-    data = rand_events(logE, mass, v_stations)
-    np.savez_compressed(
-        'showers.npz',
-        logE=data['logE'],
-        mass=data['mass'],
-        Xmax=data['Xmax'],
-        time=data['time'],
-        signal=data['signal'],
-        signal1=data['signal1'],
-        signal2=data['signal2'],
-        showercore=data['showercore'],
-        showeraxis=data['showeraxis'],
-        showermax=data['showermax'],
-        detector=data['detector'])
+    nb_events = 1000
+    packageSize = 10
+    for i in range(nb_events//packageSize):
+        # simulate events
+        logE = 18.5 + 1.5 * np.random.rand(packageSize)
+        mass = 1 * np.ones(packageSize)
+        data = rand_events(logE, mass, v_stations)
+        print "Saving package"
+        np.savez_compressed(
+            'showersCone_%i.npz' %i,
+            logE=data['logE'],
+            mass=data['mass'],
+            Xmax=data['Xmax'],
+            time=data['time'],
+            signal=data['signal'],
+            signal1=data['signal1'],
+            signal2=data['signal2'],
+            showercore=data['showercore'],
+            showeraxis=data['showeraxis'],
+            showermax=data['showermax'],
+            detector=data['detector'])
+        phi, zenith = utils.vec2ang(data['showeraxis'])
+        plotting.plot_time_distribution(data['time'], fname='plots/time_distribution_%i.png' %i)
+        plotting.plot_signal_distribution(data['signal'], fname='plots/signal_distribution_%i.png' %i)
+        plotting.plot_energy_distribution(data['logE'], fname='plots/energy_distribution_%i.png' %i)
+        plotting.plot_xmax_distribution(data['Xmax'], fname='plots/xmax_distribution_%i.png' %i)
+        plotting.plot_zenith_distribution(zenith, fname='plots/zenith_distribution_%i.png' %i)
+        plotting.plot_phi_distribution(phi, fname='plots/phi_distribution_%i.png' %i)
+        plotting.plot_stations_vs_energy(data['logE'], data['signal'], fname='plots/stations_vs_energy_%i.png' %i)
+        plotting.plot_stations_vs_zenith(zenith, data['signal'], fname='plots/stations_vs_zenith_%i.png' %i)
+        plotting.plot_stations_vs_zenith(phi, data['signal'], fname='plots/stations_vs_phi_%i.png' %i)
+        plotting.plot_array_traces(Smu=data['signal1'][1], Sem=data['signal2'][1], v_stations=data['detector'], n=5, fname='plots/example-trace_%i.png' %i)
+        del data
+print "Finished!"
