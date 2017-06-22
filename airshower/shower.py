@@ -27,18 +27,22 @@ def station_response(r, dX, logE=19, zenith=0, mass=1):
     # # scaling with zenith angle (similar to S1000 --> S38 relation, CIC)
     # x = np.cos(zenith)**2 - np.cos(np.deg2rad(38))**2
     # S0 *= 1 + 0.95 * x - 1.4 * x**2 - 1.1 * x**3
+
     # relative scaling mu/em and scaling with mass number
-    a = mass**0.15
-    S1 = S0 * a / (a + 1) * 1
-    S2 = S0 * 1 / (a + 1) * 2.5
+    r1 = 0.3 * mass**0.15
+    r2 = 0.7
+    S1 = S0 * r1 / (r1 + r2)
+    S2 = S0 * r2 / (r1 + r2)
+
     # scaling with distance of station to shower axis
     S1 *= (np.maximum(r, 150) / 1000)**-4.7
     S2 *= (np.maximum(r, 150) / 1000)**-6.1
+
     # scaling with traversed atmosphere to station
     S1 *= np.minimum((dX / 100)**-0.1, 10)
     S2 *= np.minimum((dX / 100)**-0.4, 10)
 
-    # limit total signal, otherwise we get memory problems when drawing that many samples from distribution
+    # limit total signal (saturation / memory constraints)
     Stot = S1 + S2
     Smax = 1E7
     if Stot > Smax:
@@ -118,15 +122,15 @@ def rand_shower_geometry(logE, mass):
     d = (h - HEIGHT) / np.cos(zenith)
     v_max = v_core + v_axis * d[:, np.newaxis]
 
-    # 5) virtual origin at 90% of Xmax
-    h = atmosphere.height_at_slant_depth(0.9 * Xmax, zenith)
+    # 5) virtual origin at 50% of Xmax
+    h = atmosphere.height_at_slant_depth(0.5 * Xmax, zenith)
     d = (h - HEIGHT) / np.cos(zenith)
     v_origin = v_core + v_axis * d[:, np.newaxis]
 
     return Xmax, v_axis, v_core, v_max, v_origin
 
 
-def rand_events(logE, mass, v_stations, fname=None):
+def rand_events(logE, mass, v_stations, fname=None, wavefront='planar'):
     """Simulate events for given energy, mass, and detector positions."""
 
     nb_events = len(logE)
@@ -142,24 +146,29 @@ def rand_events(logE, mass, v_stations, fname=None):
     S1 = np.zeros((nb_events, nb_stations, 80))
     S2 = np.zeros((nb_events, nb_stations, 80))
     for i in range(nb_events):
-        print('%4i, logE = %.2f' % (i, logE[i]))
+        # print('%4i, logE = %.2f' % (i, logE[i]))
         S1[i], S2[i] = detector_response(logE[i], mass[i], v_axis[i], v_core[i], v_max[i], v_stations)
-        # T[i] = utils.arrival_time_planar(v_stations, v_core[i], v_axis[i])
-        T[i] = utils.arrival_time_spherical(v_stations, v_origin[i], v_core[i])
+        if wavefront == 'planar':
+            T[i] = utils.arrival_time_planar(v_stations, v_core[i], v_axis[i])
+        elif wavefront == 'spherical':
+            T[i] = utils.arrival_time_spherical(v_stations, v_origin[i], v_core[i])
+        else:
+            raise ValueError('wavefront must be "planar" or "spherical"')
 
     # total signal
     S = S1 + S2
     # add per ton noise on arrival time
     Stot = S.sum(axis=-1)
-    sigma = 8. / (1 + np.log10(Stot + 1))  # varies from ~ 1 - 8
-    T += sigma * 40E-9 * np.random.randn(*T.shape)
-    # add time offset per event (to account for core position)
+    sigma = 60E-9 * 8. / (1 + np.log10(Stot + 1))  # varies from ~(1-8)*60 ns
+    T += sigma * np.random.randn(*T.shape)
+    # add time offset per event (to account for random core position)
     T += 100E-9 * (np.random.rand(nb_events, 1) - 0.5)
     # add relative noise to signal pulse
-    S += 0.02 * S * np.random.randn(*S.shape)
+    S += 0.05 * S * np.random.randn(*S.shape)
     # add absolute noise to signal pulse
     noise_level = 1.2
     S += noise_level * (1 + 0.5 * np.random.randn(*S.shape))
+    S = np.clip(S, 0, None)
     # trigger threshold: use only stations with sufficient signal-to-noise
     c = S.sum(axis=-1) < 80 * noise_level * 1.2
     T[c] = np.NaN
@@ -182,37 +191,20 @@ def rand_events(logE, mass, v_stations, fname=None):
 if __name__ == '__main__':
     # detector array, vector of (x,y,z) positions
     v_stations = utils.station_coordinates(11, layout='offset')
-    nb_events = 1000
-    packageSize = 10
-    for i in range(nb_events//packageSize):
-        # simulate events
-        logE = 18.5 + 1.5 * np.random.rand(packageSize)
-        mass = 1 * np.ones(packageSize)
-        data = rand_events(logE, mass, v_stations)
-        print "Saving package"
-        np.savez_compressed(
-            'showersCone_%i.npz' %i,
-            logE=data['logE'],
-            mass=data['mass'],
-            Xmax=data['Xmax'],
-            time=data['time'],
-            signal=data['signal'],
-            signal1=data['signal1'],
-            signal2=data['signal2'],
-            showercore=data['showercore'],
-            showeraxis=data['showeraxis'],
-            showermax=data['showermax'],
-            detector=data['detector'])
-        phi, zenith = utils.vec2ang(data['showeraxis'])
-        plotting.plot_time_distribution(data['time'], fname='plots/time_distribution_%i.png' %i)
-        plotting.plot_signal_distribution(data['signal'], fname='plots/signal_distribution_%i.png' %i)
-        plotting.plot_energy_distribution(data['logE'], fname='plots/energy_distribution_%i.png' %i)
-        plotting.plot_xmax_distribution(data['Xmax'], fname='plots/xmax_distribution_%i.png' %i)
-        plotting.plot_zenith_distribution(zenith, fname='plots/zenith_distribution_%i.png' %i)
-        plotting.plot_phi_distribution(phi, fname='plots/phi_distribution_%i.png' %i)
-        plotting.plot_stations_vs_energy(data['logE'], data['signal'], fname='plots/stations_vs_energy_%i.png' %i)
-        plotting.plot_stations_vs_zenith(zenith, data['signal'], fname='plots/stations_vs_zenith_%i.png' %i)
-        plotting.plot_stations_vs_zenith(phi, data['signal'], fname='plots/stations_vs_phi_%i.png' %i)
-        plotting.plot_array_traces(Smu=data['signal1'][1], Sem=data['signal2'][1], v_stations=data['detector'], n=5, fname='plots/example-trace_%i.png' %i)
-        del data
-print "Finished!"
+
+    # simulate events
+    n = 1000
+    logE = 18.5 + 1.5 * np.random.rand(n)
+    mass = 1
+    data = rand_events(logE, mass, v_stations)
+
+    phi, zenith = utils.vec2ang(data['showeraxis'])
+    plotting.plot_time_distribution(data['time'], fname='time_distribution.png')
+    plotting.plot_signal_distribution(data['signal'], fname='signal_distribution.png')
+    plotting.plot_energy_distribution(data['logE'], fname='energy_distribution.png')
+    plotting.plot_xmax_distribution(data['Xmax'], fname='xmax_distribution.png')
+    plotting.plot_zenith_distribution(zenith, fname='zenith_distribution.png')
+    plotting.plot_phi_distribution(phi, fname='phi_distribution.png')
+    plotting.plot_stations_vs_energy(data['logE'], data['signal'], fname='stations_vs_energy.png')
+    plotting.plot_stations_vs_zenith(zenith, data['signal'], fname='stations_vs_zenith.png')
+    plotting.plot_array_traces(Smu=data['signal1'][1], Sem=data['signal2'][1], v_stations=data['detector'], n=5, fname='example-trace.png')
